@@ -34,7 +34,7 @@ The migration creates one `posts` queue table, indexes, validation constraints, 
 
 1. Create an API key in Google AI Studio.
 2. Set `GEMINI_API_KEY`.
-3. `GEMINI_MODEL` defaults to `gemini-3.6-flash`; change it only to a model available to your key that supports structured JSON output.
+3. `GEMINI_MODEL` defaults to the fast, cost-efficient `gemini-3.5-flash-lite`; change it only to a model available to your key that supports structured JSON output.
 
 The generator supplies the latest 100 quotes to Gemini, validates its JSON, and rejects exact or strongly overlapping results locally. The database hash is the final exact-duplicate safeguard.
 
@@ -105,7 +105,7 @@ On Hobby, actual publication can be up to roughly 59 minutes later than the targ
 
 ## 10. Operations and retry behavior
 
-- Gemini requests use exponential backoff for temporary 429/5xx errors. After three unsuccessful attempts on the primary model, generation falls back to the stable, lower-demand `gemini-3.5-flash-lite` model. A batch that still cannot supply enough unique posts fails without publishing partial AI output.
+- Gemini generation makes at most three attempts with increasing delays. Timeouts, network errors, and temporary 429/5xx responses are retried; the final attempt uses an alternate stable model. A batch that still cannot supply enough unique posts fails without publishing partial AI output.
 - Cloudinary uploads retry three times. A row remains `generated` after a persistent image failure and is retried by the next generator run.
 - Instagram failures increment `retry_count`; the same row and image are retried later. At three failures the row becomes `failed` with `error_message` preserved.
 - A publishing claim becomes recoverable after 15 minutes if a function stops unexpectedly.

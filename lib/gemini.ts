@@ -3,7 +3,8 @@ import { CATEGORIES, type GeneratedPost } from "./types";
 import { isTooSimilar } from "./similarity";
 import { sleep } from "./utils";
 
-const FALLBACK_MODEL = "gemini-3.5-flash-lite";
+const FAST_MODEL = "gemini-3.5-flash-lite";
+const QUALITY_MODEL = "gemini-3.6-flash";
 
 class GeminiRequestError extends Error {
   constructor(public readonly status: number, message: string) {
@@ -71,7 +72,7 @@ Do not repeat or closely rewrite any idea in this recent-content list:\n${recent
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 1.05 },
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(60_000),
     },
   );
   if (!response.ok) {
@@ -96,20 +97,24 @@ async function requestBatchWithFallback(
   recentQuotes: string[],
   categoryOffset: number,
 ): Promise<GeneratedPost[]> {
-  const models = [...new Set([env.geminiModel(), FALLBACK_MODEL])];
+  const primaryModel = env.geminiModel();
+  const fallbackModel = primaryModel === FAST_MODEL ? QUALITY_MODEL : FAST_MODEL;
+  const attemptModels = [primaryModel, primaryModel, fallbackModel];
   let lastError: unknown;
 
-  for (const model of models) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        return await requestBatch(count, recentQuotes, categoryOffset, model);
-      } catch (error) {
-        lastError = error;
-        const retryable = error instanceof GeminiRequestError
-          && (error.status === 429 || error.status >= 500);
-        if (!retryable) throw error;
-        if (attempt < 2) await sleep(attempt === 0 ? 2_000 : 5_000);
-      }
+  for (let attempt = 0; attempt < attemptModels.length; attempt += 1) {
+    const model = attemptModels[attempt];
+    try {
+      return await requestBatch(count, recentQuotes, categoryOffset, model);
+    } catch (error) {
+      lastError = error;
+      const isTimeout = error instanceof DOMException
+        && (error.name === "TimeoutError" || error.name === "AbortError");
+      const isNetworkFailure = error instanceof TypeError;
+      const isTemporaryApiFailure = error instanceof GeminiRequestError
+        && (error.status === 429 || error.status >= 500);
+      if (!isTimeout && !isNetworkFailure && !isTemporaryApiFailure) throw error;
+      if (attempt < attemptModels.length - 1) await sleep(attempt === 0 ? 2_000 : 5_000);
     }
   }
 

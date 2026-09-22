@@ -6,7 +6,7 @@ const required = (name: string): string => {
 
 export const env = {
   geminiApiKey: () => required("GEMINI_API_KEY"),
-  geminiModel: () => process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash",
+  geminiModel: () => process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite",
   supabaseUrl: () => required("SUPABASE_URL"),
   supabaseServiceRoleKey: () => required("SUPABASE_SERVICE_ROLE_KEY"),
   cloudinaryCloudName: () => required("CLOUDINARY_CLOUD_NAME"),
