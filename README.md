@@ -105,7 +105,7 @@ On Hobby, actual publication can be up to roughly 59 minutes later than the targ
 
 ## 10. Operations and retry behavior
 
-- Gemini requests retry up to three times. A batch that still cannot supply enough unique posts fails without publishing partial AI output.
+- Gemini requests use exponential backoff for temporary 429/5xx errors. After three unsuccessful attempts on the primary model, generation falls back to the stable, lower-demand `gemini-3.5-flash-lite` model. A batch that still cannot supply enough unique posts fails without publishing partial AI output.
 - Cloudinary uploads retry three times. A row remains `generated` after a persistent image failure and is retried by the next generator run.
 - Instagram failures increment `retry_count`; the same row and image are retried later. At three failures the row becomes `failed` with `error_message` preserved.
 - A publishing claim becomes recoverable after 15 minutes if a function stops unexpectedly.

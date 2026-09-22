@@ -1,7 +1,15 @@
 import { env } from "./env";
 import { CATEGORIES, type GeneratedPost } from "./types";
 import { isTooSimilar } from "./similarity";
-import { withRetry } from "./utils";
+import { sleep } from "./utils";
+
+const FALLBACK_MODEL = "gemini-3.5-flash-lite";
+
+class GeminiRequestError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
 
 const SYSTEM_INSTRUCTION = `You are writing original content for a Gen Z Instagram text-based page.
 
@@ -43,13 +51,18 @@ function cleanPost(value: unknown): GeneratedPost | null {
   return { category, quote, caption, hashtags };
 }
 
-async function requestBatch(count: number, recentQuotes: string[], categoryOffset: number): Promise<GeneratedPost[]> {
+async function requestBatch(
+  count: number,
+  recentQuotes: string[],
+  categoryOffset: number,
+  model: string,
+): Promise<GeneratedPost[]> {
   const categories = Array.from({ length: count }, (_, index) => CATEGORIES[(categoryOffset + index) % CATEGORIES.length]);
   const prompt = `Generate exactly ${count} distinct posts as a JSON array. Use these categories in order, one per post: ${categories.join(", ")}.
 
 Do not repeat or closely rewrite any idea in this recent-content list:\n${recentQuotes.map((quote, index) => `${index + 1}. ${quote}`).join("\n") || "(none)"}`;
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.geminiModel())}:generateContent?key=${encodeURIComponent(env.geminiApiKey())}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.geminiApiKey())}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -61,7 +74,12 @@ Do not repeat or closely rewrite any idea in this recent-content list:\n${recent
       signal: AbortSignal.timeout(45_000),
     },
   );
-  if (!response.ok) throw new Error(`Gemini request failed (${response.status}): ${(await response.text()).slice(0, 500)}`);
+  if (!response.ok) {
+    throw new GeminiRequestError(
+      response.status,
+      `Gemini request failed using ${model} (${response.status}): ${(await response.text()).slice(0, 500)}`,
+    );
+  }
   const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
   const text = body.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("");
   if (!text) throw new Error("Gemini returned no text");
@@ -73,12 +91,41 @@ Do not repeat or closely rewrite any idea in this recent-content list:\n${recent
     .map((post, index) => ({ ...post, category: categories[index] || post.category }));
 }
 
+async function requestBatchWithFallback(
+  count: number,
+  recentQuotes: string[],
+  categoryOffset: number,
+): Promise<GeneratedPost[]> {
+  const models = [...new Set([env.geminiModel(), FALLBACK_MODEL])];
+  let lastError: unknown;
+
+  for (const model of models) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await requestBatch(count, recentQuotes, categoryOffset, model);
+      } catch (error) {
+        lastError = error;
+        const retryable = error instanceof GeminiRequestError
+          && (error.status === 429 || error.status >= 500);
+        if (!retryable) throw error;
+        if (attempt < 2) await sleep(attempt === 0 ? 2_000 : 5_000);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export async function generateUniquePosts(count: number, recentQuotes: string[]): Promise<GeneratedPost[]> {
   const accepted: GeneratedPost[] = [];
   let calls = 0;
   while (accepted.length < count && calls < 3) {
     const needed = count - accepted.length;
-    const batch = await withRetry(() => requestBatch(needed, [...recentQuotes, ...accepted.map((p) => p.quote)], accepted.length), 3, 800);
+    const batch = await requestBatchWithFallback(
+      needed,
+      [...recentQuotes, ...accepted.map((post) => post.quote)],
+      accepted.length,
+    );
     calls += 1;
     for (const post of batch) {
       const prior = [...recentQuotes, ...accepted.map((item) => item.quote)];
