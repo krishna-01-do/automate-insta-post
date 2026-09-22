@@ -34,7 +34,7 @@ The migration creates one `posts` queue table, indexes, validation constraints, 
 
 1. Create an API key in Google AI Studio.
 2. Set `GEMINI_API_KEY`.
-3. `GEMINI_MODEL` defaults to `gemini-2.5-flash`; change it only to a model available to your key that supports structured JSON output.
+3. `GEMINI_MODEL` defaults to `gemini-3.6-flash`; change it only to a model available to your key that supports structured JSON output.
 
 The generator supplies the latest 100 quotes to Gemini, validates its JSON, and rejects exact or strongly overlapping results locally. The database hash is the final exact-duplicate safeguard.
 
