@@ -1,8 +1,9 @@
 export const CATEGORIES = [
-  "Funny", "Relatable", "Adulting", "Dating", "Relationships",
-  "Psychology-inspired observations", "Human behaviour", "Dark humour",
-  "Sarcasm", "Gen Z", "Work", "Money", "Overthinking", "Friendships",
-  "Modern life", "Deep thoughts",
+  "Savage relatable", "Sarcastic adulting", "Funny modern life", "Savage dating",
+  "Relatable situationships", "Sarcastic friendships", "Dark humour",
+  "Funny overthinking", "Savage work life", "Relatable money problems",
+  "Sarcastic social media", "Funny human behaviour", "Cool Gen Z observations",
+  "Savage relationships", "Relatable awkward moments", "Funny everyday struggles",
 ] as const;
 
 export type GeneratedPost = {

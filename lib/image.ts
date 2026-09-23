@@ -37,7 +37,7 @@ export function wrapQuote(quote: string, fontSize: number): string[] {
   return lines;
 }
 
-export function createQuoteSvg(quote: string, category: string, templateIndex = 0): string {
+export function createQuoteSvg(quote: string, _category: string, templateIndex = 0): string {
   const template = TEMPLATES[Math.abs(templateIndex) % TEMPLATES.length];
   const fontSize = selectFontSize(quote.length);
   const lines = wrapQuote(quote, fontSize);
@@ -52,6 +52,6 @@ export function createQuoteSvg(quote: string, category: string, templateIndex = 
 <rect width="1080" height="1350" fill="${template.background}"/>
 <rect x="490" y="164" width="100" height="8" rx="4" fill="${template.accent}"/>
 ${text}
-<text x="540" y="1170" text-anchor="middle" fill="${template.foreground}" opacity="0.58" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600" letter-spacing="3">${escapeXml(category.toUpperCase())}</text>
+<text x="540" y="1170" text-anchor="middle" fill="${template.foreground}" opacity="0.62" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" letter-spacing="2">@brosaid.it</text>
 </svg>`;
 }
