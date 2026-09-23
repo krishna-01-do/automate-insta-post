@@ -44,7 +44,7 @@ Create a Cloudinary account and copy the cloud name, API key, and API secret int
 
 ## 5. Instagram Graph API
 
-You need an Instagram **Professional** account (Business or Creator) connected according to Meta's Instagram API setup, a Meta app with content-publishing access, the Instagram account ID, and a long-lived access token with the required publishing permissions.
+You need an Instagram **Professional** account (Business or Creator) connected according to Meta's Instagram API setup, a Meta app with content-publishing access, the Instagram account ID, and a long-lived access token with the required publishing permissions. The integration automatically supports both Meta token families: Instagram Login tokens (`IG…`) use `graph.instagram.com`, while Facebook Login/Page tokens (`EAA…`) use `graph.facebook.com`.
 
 Set:
 

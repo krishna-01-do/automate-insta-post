@@ -4,8 +4,16 @@ import { sleep } from "./utils";
 type GraphError = { error?: { message?: string; code?: number; error_subcode?: number } };
 type ContainerStatus = { status_code?: "EXPIRED" | "ERROR" | "FINISHED" | "IN_PROGRESS" | "PUBLISHED"; status?: string };
 
+function graphApiOrigin(): string {
+  // Instagram Login tokens and Facebook Login/Page tokens are both valid for
+  // publishing, but Meta requires them to be sent to different Graph domains.
+  return env.instagramAccessToken().startsWith("IG")
+    ? "https://graph.instagram.com"
+    : "https://graph.facebook.com";
+}
+
 function endpoint(path: string) {
-  return `https://graph.facebook.com/${env.graphVersion()}/${path}`;
+  return `${graphApiOrigin()}/${env.graphVersion()}/${path}`;
 }
 
 async function graph<T>(url: string, init?: RequestInit): Promise<T> {
