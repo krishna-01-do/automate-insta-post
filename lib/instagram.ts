@@ -36,7 +36,12 @@ export async function findRecentPublishedByCaption(caption: string): Promise<str
 }
 
 export async function createMediaContainer(imageUrl: string, caption: string): Promise<string> {
-  const body = new URLSearchParams({ image_url: imageUrl, caption, access_token: env.instagramAccessToken() });
+  const body = new URLSearchParams({
+    image_url: imageUrl,
+    media_type: "IMAGE",
+    caption,
+    access_token: env.instagramAccessToken(),
+  });
   const result = await graph<{ id: string }>(endpoint(`${env.instagramAccountId()}/media`), { method: "POST", body });
   if (!result.id) throw new Error("Instagram did not return a media container ID");
   return result.id;
