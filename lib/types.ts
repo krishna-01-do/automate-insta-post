@@ -1,9 +1,9 @@
 export const CATEGORIES = [
-  "Savage relatable", "Sarcastic adulting", "Funny modern life", "Savage dating",
-  "Relatable situationships", "Sarcastic friendships", "Dark humour",
-  "Funny overthinking", "Savage work life", "Relatable money problems",
-  "Sarcastic social media", "Funny human behaviour", "Cool Gen Z observations",
-  "Savage relationships", "Relatable awkward moments", "Funny everyday struggles",
+  "Desi adulting", "Indian family sarcasm", "Salary and UPI struggles", "Savage dating",
+  "Relatable situationships", "Indian office humour", "College and exam chaos",
+  "Funny overthinking", "Traffic and commute pain", "Being broke after salary day",
+  "Family WhatsApp groups", "Relatives and wedding questions", "Food delivery decisions",
+  "Friendship roasting", "Social battery problems", "Everyday Indian struggles",
 ] as const;
 
 export type GeneratedPost = {

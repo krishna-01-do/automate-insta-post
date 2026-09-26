@@ -31,4 +31,12 @@ test("renders safe 1080 by 1350 SVG with wrapped text", () => {
   const svg = createQuoteSvg("You & me < coffee", "Relatable", 2);
   assert.match(svg, /width="1080" height="1350"/);
   assert.match(svg, /You &amp; me &lt; coffee/);
+  assert.match(svg, /@brosaid\.it/);
+  assert.doesNotMatch(svg, />RELATABLE</);
+});
+
+test("rotates through five visually distinct meme templates", () => {
+  const variants = Array.from({ length: 5 }, (_, index) => createQuoteSvg("Salary came. Bills said welcome back.", "Desi adulting", index));
+  assert.equal(new Set(variants).size, 5);
+  assert.ok(variants.every((svg) => svg.includes("@brosaid.it")));
 });
