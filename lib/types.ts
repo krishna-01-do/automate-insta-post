@@ -16,6 +16,8 @@ export type GeneratedPost = {
 export type PostRow = GeneratedPost & {
   id: string;
   image_url: string | null;
+  video_url: string | null;
+  video_public_id: string | null;
   status: "generated" | "pending" | "publishing" | "failed";
   scheduled_at: string;
   generated_at: string;

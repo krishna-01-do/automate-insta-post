@@ -44,3 +44,30 @@ export async function deleteQuoteImage(publicId: string): Promise<void> {
     }
   }, 3, 750);
 }
+
+export async function createQuoteReel(imageUrl: string): Promise<{ url: string; publicId: string }> {
+  configure();
+  // Two identical frames held for five seconds each produce a ten-second clip.
+  // Instagram attaches catalog audio when it creates the Reel container.
+  return withRetry(async () => {
+    const options = {
+      urls: [imageUrl, imageUrl],
+      format: "mp4" as const,
+      delay: 5_000,
+    };
+    const result = await cloudinary.uploader.multi("", options);
+    if (!result.secure_url || !result.public_id) throw new Error("Cloudinary did not return a Reel video URL");
+    return { url: result.secure_url, publicId: result.public_id };
+  }, 3, 750);
+}
+
+export async function deleteQuoteReel(publicId: string, url: string): Promise<void> {
+  configure();
+  const resourceType = new URL(url).pathname.includes("/image/upload/") ? "image" : "video";
+  await withRetry(async () => {
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType, invalidate: true });
+    if (result.result !== "ok" && result.result !== "not found") {
+      throw new Error(`Cloudinary Reel deletion failed: ${result.result}`);
+    }
+  }, 3, 750);
+}

@@ -8,6 +8,8 @@ create table if not exists public.posts (
   caption text not null,
   hashtags jsonb not null default '[]'::jsonb check (jsonb_typeof(hashtags) = 'array'),
   image_url text,
+  video_url text,
+  video_public_id text,
   status text not null check (status in ('generated', 'pending', 'publishing', 'failed')),
   scheduled_at timestamptz not null,
   generated_at timestamptz not null default now(),

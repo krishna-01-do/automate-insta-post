@@ -2,7 +2,7 @@ import {
   createMediaContainer, findRecentPublishedByCaption, formatInstagramCaption,
   getContainerStatus, publishMediaContainer, waitUntilContainerReady,
 } from "./instagram";
-import { deleteQuoteImage } from "./cloudinary";
+import { createQuoteReel, deleteQuoteImage, deleteQuoteReel } from "./cloudinary";
 import { getSupabase } from "./supabase";
 import type { PostRow } from "./types";
 import { errorMessage } from "./utils";
@@ -11,6 +11,7 @@ async function removePublishedPost(post: PostRow): Promise<boolean> {
   const supabase = getSupabase();
   try {
     await deleteQuoteImage(post.id);
+    if (post.video_public_id && post.video_url) await deleteQuoteReel(post.video_public_id, post.video_url);
     const { error } = await supabase.from("posts").delete().eq("id", post.id);
     if (error) throw error;
     return true;
@@ -43,13 +44,27 @@ export async function runPublisher() {
       }
     }
 
+    let videoUrl = post.video_url;
+    if (!videoUrl) {
+      const video = await createQuoteReel(post.image_url);
+      const { error: videoError } = await supabase.from("posts")
+        .update({ video_url: video.url, video_public_id: video.publicId })
+        .eq("id", post.id).eq("status", "publishing");
+      if (videoError) {
+        await deleteQuoteReel(video.publicId, video.url);
+        throw videoError;
+      }
+      videoUrl = video.url;
+      post.video_public_id = video.publicId;
+    }
+
     let containerId = post.instagram_container_id;
     if (containerId) {
       const state = await getContainerStatus(containerId);
       if (state.status_code === "EXPIRED" || state.status_code === "ERROR") containerId = null;
     }
     if (!containerId) {
-      containerId = await createMediaContainer(post.image_url, fullCaption);
+      containerId = await createMediaContainer(videoUrl, fullCaption, post.category, post.id);
       const { error: saveError } = await supabase.from("posts")
         .update({ instagram_container_id: containerId }).eq("id", post.id).eq("status", "publishing");
       if (saveError) throw saveError;

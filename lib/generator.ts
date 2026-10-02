@@ -1,4 +1,4 @@
-import { uploadQuoteImage } from "./cloudinary";
+import { createQuoteReel, deleteQuoteReel, uploadQuoteImage } from "./cloudinary";
 import { generateUniquePosts } from "./gemini";
 import { createQuoteSvg } from "./image";
 import { createSchedule } from "./scheduler";
@@ -12,12 +12,22 @@ const TARGET_QUEUE_SIZE = 20;
 async function renderGeneratedPost(post: PostRow): Promise<boolean> {
   const supabase = getSupabase();
   try {
-    const svg = createQuoteSvg(post.quote, post.category, parseInt(post.id.slice(0, 8), 16));
-    const imageUrl = await uploadQuoteImage(svg, post.id);
+    let imageUrl = post.image_url;
+    if (!imageUrl) {
+      const svg = createQuoteSvg(post.quote, post.category, parseInt(post.id.slice(0, 8), 16));
+      imageUrl = await uploadQuoteImage(svg, post.id);
+      const { error: imageError } = await supabase.from("posts").update({ image_url: imageUrl })
+        .eq("id", post.id).eq("status", "generated");
+      if (imageError) throw imageError;
+    }
+    const video = await createQuoteReel(imageUrl);
     const { error } = await supabase.from("posts").update({
-      image_url: imageUrl, status: "pending", error_message: null,
+      video_url: video.url, video_public_id: video.publicId, status: "pending", error_message: null,
     }).eq("id", post.id).eq("status", "generated");
-    if (error) throw error;
+    if (error) {
+      await deleteQuoteReel(video.publicId, video.url);
+      throw error;
+    }
     return true;
   } catch (error) {
     await supabase.from("posts").update({ error_message: errorMessage(error).slice(0, 2_000) }).eq("id", post.id);

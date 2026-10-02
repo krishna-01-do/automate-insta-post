@@ -1,12 +1,12 @@
-# Instagram Text Post Automation
+# Instagram Music Reel Automation
 
-A private Next.js service that generates a temporary queue of original text posts, renders each one as a 1080×1350 image, and publishes due posts to one Instagram professional account. There is no dashboard, authentication, billing, multi-account layer, or permanent post archive.
+A private Next.js service that generates original text memes, renders each as a quote image and a ten-second video, selects matching music from Meta's Instagram audio catalog, and publishes it as a Reel to one Instagram professional account. There is no dashboard, authentication, billing, multi-account layer, or permanent post archive.
 
 ## How it works
 
-- At approximately **05:30–06:29 IST** (`00:00 UTC` cron window), `/api/cron/generate` makes sure the queue contains 20 posts. It retries unfinished image work first, asks Gemini for any missing posts, rejects recent duplicates, assigns IST posting slots, renders SVG templates, uploads JPEG renditions to Cloudinary, and marks them pending.
-- Ten once-daily publisher cron jobs run roughly 1–2 hours apart. Each calls a numbered path such as `/api/cron/publish/1`, atomically claims the oldest due post, creates or resumes its Instagram media container, waits until it is ready, and publishes it.
-- After Instagram confirms publication, the service deletes the Cloudinary image and its Supabase row. Supabase therefore contains only queued, retrying, or failed work—not published-post history.
+- At approximately **05:30–06:29 IST** (`00:00 UTC` cron window), `/api/cron/generate` makes sure the queue contains 20 posts. It retries unfinished media work first, asks Gemini for any missing posts, rejects recent duplicates, assigns IST posting slots, renders SVG templates, uploads JPEG renditions to Cloudinary, converts each image to a ten-second MP4, and marks them pending.
+- Ten once-daily publisher cron jobs run roughly 1–2 hours apart. Each calls a numbered path such as `/api/cron/publish/1`, atomically claims the oldest due post, searches Meta's available music catalog, creates or resumes its Instagram Reel container with the selected audio, waits until it is ready, and publishes it.
+- After Instagram confirms publication, the service deletes the Cloudinary image and video and its Supabase row. Supabase therefore contains only queued, retrying, or failed work—not published-post history.
 - Failed Instagram attempts return the same post to the queue. After three attempts it is marked `failed`. A saved container ID and a recent-caption lookup let the service recover safely from most interrupted requests without creating a second Instagram post.
 
 This configuration works on **Vercel Hobby**: every individual cron job runs only once per day. Hobby timing is approximate, so Vercel may invoke a job at any point within its scheduled UTC hour.
@@ -28,7 +28,7 @@ cp .env.example .env.local
 
 The service-role key is server-only. Never expose it through a `NEXT_PUBLIC_` variable. Row Level Security is enabled and no public table policies are created.
 
-The migration creates one `posts` queue table, indexes, validation constraints, a unique normalized quote hash, timestamps, and the `claim_due_post()` function used to prevent concurrent cron runs from publishing the same row.
+The migration creates one `posts` queue table, indexes, validation constraints, a unique normalized quote hash, timestamps, and the `claim_due_post()` function used to prevent concurrent cron runs from publishing the same row. For an existing database, run `supabase/add_reels.sql` once before deploying this version.
 
 ## 3. Gemini
 
@@ -40,11 +40,11 @@ The generator supplies the latest 100 quotes to Gemini, validates its JSON, and 
 
 ## 4. Cloudinary
 
-Create a Cloudinary account and copy the cloud name, API key, and API secret into the three `CLOUDINARY_*` variables. The backend uploads an SVG data URI with a signed server-side request and eagerly renders a public 1080×1350 JPEG URL for Instagram.
+Create a Cloudinary account and copy the cloud name, API key, and API secret into the three `CLOUDINARY_*` variables. The backend uploads an SVG data URI with a signed server-side request and eagerly renders a public 1080×1350 JPEG. Cloudinary's `multi` endpoint then turns the image into a ten-second MP4 for Instagram. Check that your Cloudinary plan permits MP4 generation and delivery.
 
 ## 5. Instagram Graph API
 
-You need an Instagram **Professional** account (Business or Creator) connected according to Meta's Instagram API setup, a Meta app with content-publishing access, the Instagram account ID, and a long-lived access token with the required publishing permissions. The integration automatically supports both Meta token families: Instagram Login tokens (`IG…`) use `graph.instagram.com`, while Facebook Login/Page tokens (`EAA…`) use `graph.facebook.com`.
+You need an Instagram **Professional** account (Business or Creator) connected through **Facebook Login**, a Meta app with content-publishing and Instagram Audio API access, the Instagram account ID, and a long-lived Facebook/Page access token with the required permissions. Meta catalog music search and audio attachment require Facebook Login; Instagram Login tokens (`IG…`) cannot be used for music Reels in this workflow.
 
 Set:
 
@@ -54,7 +54,7 @@ INSTAGRAM_ACCESS_TOKEN=your_long_lived_token
 META_GRAPH_API_VERSION=v23.0
 ```
 
-Meta access tokens expire or can be revoked. “No manual work” remains true only while the credentials and connected account remain valid. Use a Graph API version supported by your Meta app; update `META_GRAPH_API_VERSION` when you deliberately upgrade.
+The publisher searches the available catalog for Bollywood, Hindi, or Indian music. Meta may return only a subset of its in-app music library for your account and region. If no matching track is available, the post fails instead of publishing silently. The catalog does not guarantee a Bollywood song for each post. Meta access tokens expire or can be revoked. Use a Graph API version supported by your Meta app; update `META_GRAPH_API_VERSION` when you deliberately upgrade.
 
 ## 6. Environment variables
 
@@ -106,11 +106,11 @@ On Hobby, actual publication can be up to roughly 59 minutes later than the targ
 ## 10. Operations and retry behavior
 
 - Gemini generation makes at most three attempts with increasing delays. Timeouts, network errors, and temporary 429/5xx responses are retried; the final attempt uses an alternate stable model. A batch that still cannot supply enough unique posts fails without publishing partial AI output.
-- Cloudinary uploads retry three times. A row remains `generated` after a persistent image failure and is retried by the next generator run.
+- Cloudinary image and video generation retry three times. A row remains `generated` after a persistent media failure and is retried by the next generator run. Existing pending image rows are converted to video when claimed.
 - Instagram failures increment `retry_count`; the same row and image are retried later. At three failures the row becomes `failed` with `error_message` preserved.
 - A publishing claim becomes recoverable after 15 minutes if a function stops unexpectedly.
 - If Instagram accepted a publish but cleanup was interrupted, the next attempt searches recent account media for the exact caption instead of publishing it again, then completes deletion.
-- Published images and rows are deleted automatically. Only queued, retrying, and failed rows consume storage.
+- Published images, videos, and rows are deleted automatically. Only queued, retrying, and failed rows consume storage.
 
 Check Vercel function logs and the Supabase `posts` table if a post reaches `failed`. After fixing the underlying credential/API problem, reset that row to `pending`, set `retry_count` to `0`, and clear `error_message` to retry it.
 

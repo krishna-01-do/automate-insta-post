@@ -1,5 +1,5 @@
-import { env } from "./env";
-import { sleep } from "./utils";
+import { env } from "./env.ts";
+import { sleep } from "./utils.ts";
 
 type GraphError = { error?: { message?: string; code?: number; error_subcode?: number } };
 type ContainerStatus = { status_code?: "EXPIRED" | "ERROR" | "FINISHED" | "IN_PROGRESS" | "PUBLISHED"; status?: string };
@@ -16,8 +16,8 @@ function endpoint(path: string) {
   return `${graphApiOrigin()}/${env.graphVersion()}/${path}`;
 }
 
-async function graph<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(30_000) });
+async function graph<T>(url: string, init?: RequestInit, timeoutMs = 30_000): Promise<T> {
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   const body = await response.json() as T & GraphError;
   if (!response.ok || body.error) {
     throw new Error(`Instagram API failed (${response.status}): ${body.error?.message || "Unknown error"}`);
@@ -29,16 +29,61 @@ export function formatInstagramCaption(caption: string, hashtags: string[]): str
   return `${caption.trim()}\n\n${hashtags.join(" ")}`.trim();
 }
 
+type CatalogAudio = { audio_id?: string; title?: string; display_artist?: string; duration_in_ms?: number };
+
+const AUDIO_SEARCHES: Record<string, string> = {
+  "Savage dating": "Bollywood romance",
+  "Relatable situationships": "Bollywood romance",
+  "Relatives and wedding questions": "Bollywood wedding",
+  "Indian family sarcasm": "Bollywood comedy",
+  "Family WhatsApp groups": "Bollywood comedy",
+  "College and exam chaos": "Bollywood youth",
+};
+
+function scoreAudio(audio: CatalogAudio, category: string): number {
+  const label = `${audio.title || ""} ${audio.display_artist || ""}`.toLowerCase();
+  const categoryWords = category.toLowerCase().split(/\W+/).filter((word) => word.length > 3);
+  return (label.includes("bollywood") ? 5 : 0) +
+    (label.includes("hindi") ? 3 : 0) +
+    categoryWords.filter((word) => label.includes(word)).length;
+}
+
+export async function findReelAudio(category: string, postId: string): Promise<string> {
+  if (graphApiOrigin() !== "https://graph.facebook.com") {
+    throw new Error("Meta catalog audio requires a Facebook Login/Page Instagram token");
+  }
+  const query = AUDIO_SEARCHES[category] || "Bollywood";
+  for (const searchQuery of [query, "Hindi"]) {
+    const params = new URLSearchParams({
+      audio_type: "music", ig_user_id: env.instagramAccountId(),
+      search_query: searchQuery, access_token: env.instagramAccessToken(),
+    });
+    const result = await graph<{ audio?: CatalogAudio[] }>(`${endpoint("ig_audio")}?${params}`, undefined, 8_000);
+    const tracks = (result.audio || []).filter((item) => item.audio_id && (!item.duration_in_ms || item.duration_in_ms >= 10_000));
+    if (tracks.length) {
+      tracks.sort((a, b) => scoreAudio(b, category) - scoreAudio(a, category));
+      const topScore = scoreAudio(tracks[0], category);
+      const best = tracks.filter((item) => scoreAudio(item, category) === topScore);
+      const index = parseInt(postId.slice(0, 8), 16) % best.length;
+      return best[index].audio_id!;
+    }
+  }
+  throw new Error(`No suitable Meta catalog track found for ${category}; Reel was not published`);
+}
+
 export async function findRecentPublishedByCaption(caption: string): Promise<string | null> {
   const params = new URLSearchParams({ fields: "id,caption", limit: "25", access_token: env.instagramAccessToken() });
   const result = await graph<{ data?: Array<{ id: string; caption?: string }> }>(`${endpoint(`${env.instagramAccountId()}/media`)}?${params}`);
   return result.data?.find((item) => item.caption?.trim() === caption.trim())?.id || null;
 }
 
-export async function createMediaContainer(imageUrl: string, caption: string): Promise<string> {
+export async function createMediaContainer(videoUrl: string, caption: string, category: string, postId: string): Promise<string> {
+  const audioId = await findReelAudio(category, postId);
   const body = new URLSearchParams({
-    image_url: imageUrl,
-    media_type: "IMAGE",
+    video_url: videoUrl,
+    media_type: "REELS",
+    share_to_feed: "true",
+    audio_configuration: JSON.stringify({ audio_id: audioId, audio_volume: 85, video_volume: 0 }),
     caption,
     access_token: env.instagramAccessToken(),
   });
