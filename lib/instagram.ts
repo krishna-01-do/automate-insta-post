@@ -97,16 +97,18 @@ export async function getContainerStatus(containerId: string): Promise<Container
   return graph<ContainerStatus>(`${endpoint(containerId)}?${params}`);
 }
 
-export async function waitUntilContainerReady(containerId: string): Promise<ContainerStatus["status_code"]> {
+export async function waitUntilContainerReady(containerId: string, pollIntervalMs = 2_000): Promise<ContainerStatus["status_code"]> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const state = await getContainerStatus(containerId);
     if (state.status_code === "FINISHED" || state.status_code === "PUBLISHED") return state.status_code;
     if (state.status_code === "ERROR" || state.status_code === "EXPIRED") {
       throw new Error(`Instagram container ${state.status_code.toLowerCase()}: ${state.status || "no details"}`);
     }
-    await sleep(2_000);
+    if (attempt < 7) await sleep(pollIntervalMs);
   }
-  throw new Error("Instagram container was not ready before the polling timeout");
+  // Video processing can outlast one function request. Keep the container ID so
+  // the next invocation can resume without creating another Reel or using a retry.
+  return "IN_PROGRESS";
 }
 
 export async function publishMediaContainer(containerId: string): Promise<string> {

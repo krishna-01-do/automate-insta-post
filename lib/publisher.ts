@@ -71,6 +71,15 @@ export async function runPublisher() {
     }
 
     const status = await waitUntilContainerReady(containerId);
+    if (status === "IN_PROGRESS") {
+      const { error: releaseError } = await supabase.from("posts").update({
+        status: "pending",
+        publishing_started_at: null,
+        error_message: null,
+      }).eq("id", post.id).eq("status", "publishing");
+      if (releaseError) throw releaseError;
+      return { published: false, reason: "reel_processing", postId: post.id };
+    }
     if (status === "PUBLISHED") {
       const recoveredMediaId = await findRecentPublishedByCaption(fullCaption);
       if (!recoveredMediaId) throw new Error("Container is published but matching Instagram media was not found");

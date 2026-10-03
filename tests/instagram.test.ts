@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createMediaContainer, findReelAudio } from "../lib/instagram.ts";
+import { createMediaContainer, findReelAudio, waitUntilContainerReady } from "../lib/instagram.ts";
 
 test("selects catalog music and attaches it to a Reel", async (context) => {
   process.env.INSTAGRAM_ACCESS_TOKEN = "EAA_test";
@@ -30,4 +30,10 @@ test("fails when no matching music is available", async (context) => {
   process.env.INSTAGRAM_ACCOUNT_ID = "12345";
   context.mock.method(globalThis, "fetch", async () => Response.json({ audio: [] }));
   await assert.rejects(findReelAudio("Desi adulting", "12345678-test"), /No suitable Meta catalog track/);
+});
+
+test("keeps a Reel container available when Meta is still processing it", async (context) => {
+  process.env.INSTAGRAM_ACCESS_TOKEN = "EAA_test";
+  context.mock.method(globalThis, "fetch", async () => Response.json({ status_code: "IN_PROGRESS" }));
+  assert.equal(await waitUntilContainerReady("container-1", 0), "IN_PROGRESS");
 });
