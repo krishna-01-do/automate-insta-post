@@ -6,12 +6,14 @@ function required(name) {
 
 async function db(path, options = {}) {
   const url = new URL(`/rest/v1/${path}`, required("SUPABASE_URL"));
-  const key = required("SUPABASE_SERVICE_ROLE_KEY");
+  const secretKey = process.env.SUPABASE_SECRET_KEY?.trim();
+  const key = secretKey || required("SUPABASE_SERVICE_ROLE_KEY");
   const response = await fetch(url, {
     ...options,
     headers: {
       apikey: key,
-      Authorization: `Bearer ${key}`,
+      // Legacy service_role keys are JWTs; new sb_secret keys must only use apikey.
+      ...(!secretKey ? { Authorization: `Bearer ${key}` } : {}),
       "Content-Type": "application/json",
       ...options.headers,
     },

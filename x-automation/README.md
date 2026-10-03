@@ -6,10 +6,10 @@ Posts are generated with Gemini at each scheduled slot, checked against recent c
 
 ## Setup
 
-1. Create a **separate Supabase project**. Run `supabase/migration.sql` in its SQL Editor. Copy its project URL and **service_role** key. This keeps X post records separate from Instagram.
+1. Create a **separate Supabase project**. Run `supabase/migration.sql` in its SQL Editor. Copy its project URL and server-side **secret key** (`sb_secret_...`). This keeps X post records separate from Instagram. The legacy `service_role` key also works if it is already configured under `SUPABASE_SERVICE_ROLE_KEY`.
 2. In the [X Developer Console](https://console.x.com/), create or select an app, enable **Read and Write** permissions, and generate the app **API Key and Secret** plus the posting account's **Access Token and Access Token Secret**. Regenerate the user token after changing app permissions. A bearer-only app token cannot post on behalf of your account. Check that your X API credit balance and spending limit cover your intended volume.
 3. In Vercel, import the **same Git repository as a new project**, with **Root Directory** set to `x-automation`. Leave the existing Instagram project and its Root Directory untouched. Choose the **Other** framework preset. This folder has no npm dependencies or build step.
-4. Add every key from `.env.example` to the new Vercel project's **Production** environment. `CRON_SECRET` should be a long random string and must be unique to this project. `GEMINI_API_KEY` may use the same Google key if you choose, but set it separately in this Vercel project. The `SUPABASE_*` values must point to the separate X Supabase project.
+4. Add every key from `.env.example` to the new Vercel project's **Production** environment. `CRON_SECRET` should be a long random string and must be unique to this project. `GEMINI_API_KEY` may use the same Google key if you choose, but set it separately in this Vercel project. The `SUPABASE_*` values must point to the separate X Supabase project; do not add both Supabase key formats.
 5. Deploy this new Vercel project. Verify its 10 jobs in **Settings → Cron Jobs**. Production deployment activates the schedule.
 
 The slots run in UTC at 02:00, 04:00, 05:00, 07:00, 08:00, 10:00, 11:00, 13:00, 15:00, and 17:00. These correspond to approximately 07:30 through 22:30 IST. Vercel Hobby may start each job anywhere within its scheduled UTC hour, so the exact post time varies.
