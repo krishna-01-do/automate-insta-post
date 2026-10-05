@@ -35,8 +35,10 @@ test("renders safe 1080 by 1350 SVG with wrapped text", () => {
   assert.doesNotMatch(svg, />RELATABLE</);
 });
 
-test("rotates through five visually distinct meme templates", () => {
+test("uses the same black and white quote style for every image", () => {
   const variants = Array.from({ length: 5 }, (_, index) => createQuoteSvg("Salary came. Bills said welcome back.", "Desi adulting", index));
-  assert.equal(new Set(variants).size, 5);
+  assert.equal(new Set(variants).size, 1);
+  assert.ok(variants.every((svg) => svg.includes('<rect width="1080" height="1350" fill="#000000"/>')));
+  assert.ok(variants.every((svg) => svg.includes('fill="#FFFFFF"')));
   assert.ok(variants.every((svg) => svg.includes("@brosaid.it")));
 });
